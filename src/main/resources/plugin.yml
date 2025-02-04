@@ -1,0 +1,9 @@
+name: ScopesAndMore
+version: '1.0-SNAPSHOT'
+main: io.schemat.scopesAndMore.ScopesAndMore
+api-version: '1.21'
+commands:
+  probe:
+    description: Manage redstone probes
+    usage: /probe
+    permission: scopesandmore.probe
