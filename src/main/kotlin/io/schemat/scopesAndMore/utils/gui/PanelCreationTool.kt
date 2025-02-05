@@ -48,22 +48,7 @@ class PanelCreationTool(
         }
     }
 
-    private fun generatePanelCorners(first: Location, second: Location): List<Location> {
-        //        corner 1 will be bottom left
-        //        corner 2 will be bottom right
-        //        corner 3 will be top right
-        //        corner 4 will be top left
-        val corner1 = if (first.y < second.y) first else second
-        val corner3 = if (first.y > second.y) first else second
-        val height = corner3.y - corner1.y
-        val corner2 = corner3.clone().apply {
-            y = corner3.y  - height
-        }
-        val corner4 = corner1.clone().apply {
-            y = corner1.y + height
-        }
-        return listOf(corner1, corner2, corner3, corner4)
-    }
+
 
     private fun renderPointer(player: Player) {
         val lookingAt = getPlayerTargetPosition(player)
@@ -83,7 +68,7 @@ class PanelCreationTool(
         ))
 
         if (previewPanel != null) {
-            previewPanel!!.corners = generatePanelCorners(firstCorner!!, lookingAt)
+            previewPanel!!.corners = Panel.generatePanelCorners(firstCorner!!, lookingAt)
         }
     }
 
@@ -92,7 +77,7 @@ class PanelCreationTool(
 
         if (firstCorner == null) {
             firstCorner = lookingAt
-            val corners = generatePanelCorners(firstCorner!!, firstCorner!!)
+            val corners = Panel.generatePanelCorners(firstCorner!!, firstCorner!!)
             previewPanel = Panel(
                 corners = corners,
                 name = "Unnamed panel"

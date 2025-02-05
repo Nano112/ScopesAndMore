@@ -182,6 +182,25 @@ class Panel(
         return group
     }
 
+    companion object {
+        fun generatePanelCorners(first: Location, second: Location, flipped: Boolean = false): List<Location> {
+            if( !flipped) {
+                val corner1 = if (first.y < second.y) first else second
+                val corner3 = if (first.y > second.y) first else second
+                val height = corner3.y - corner1.y
+                val corner2 = corner3.clone().apply { y = corner3.y - height }
+                val corner4 = corner1.clone().apply { y = corner1.y + height }
+                return listOf(corner1, corner2, corner3, corner4)
+            }
+            val corner2 = if (first.y < second.y) first else second
+            val corner4 = if (first.y > second.y) first else second
+            val height = corner4.y - corner2.y
+            val corner1 = corner4.clone().apply { y = corner4.y - height }
+            val corner3 = corner2.clone().apply { y = corner2.y + height }
+            return listOf(corner1, corner2, corner3, corner4)
+        }
+    }
+
 
 }
 

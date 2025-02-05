@@ -4,6 +4,7 @@ import io.schemat.scopesAndMore.probe.ProbeUtils
 import io.schemat.scopesAndMore.probes.ProbeGroup
 import io.schemat.scopesAndMore.textBackgroundTransform
 import io.schemat.scopesAndMore.utils.ColorScheme
+import io.schemat.scopesAndMore.utils.gui.TextDisplay
 import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntityGroup
 import io.schemat.scopesAndMore.utils.heledron.rendering.blockRenderEntity
 import io.schemat.scopesAndMore.utils.heledron.rendering.interpolateTransform
@@ -18,11 +19,11 @@ import org.joml.Matrix4f
 import java.util.*
 
 data class TimeSeriesScopeSettings(
-    override val valueScale: Float = 0.3f,
+    override val valueScale: Float = 0.05f,
     override val labelScale: Float = 0.15f,
     override val backgroundColor: Color = ColorScheme.background.apply { alpha = 200 },
-    val lookbackSeconds: Int = 30,
-    val updateIntervalTicks: Int = 1,
+    val lookbackSeconds: Int = 10,
+    val updateIntervalTicks: Int = 2,
     val lineColor: Color = Color.GREEN,
     val gridColor: Color = Color.GRAY,
     val showGrid: Boolean = true
@@ -119,7 +120,28 @@ class TimeSeriesScope(
     }
 
     private fun buildValueString(): String {
-        return "${values.lastOrNull()?.second ?: "No data"} (${values.size} samples)"
+        val samplesPerSecond = 20 / settings.updateIntervalTicks
+        val expectedSamples = (settings.lookbackSeconds * samplesPerSecond).toInt()
+        val width = minOf(expectedSamples, 30) // Cap at 30 chars wide
+        val numericValues = values.takeLast(width).mapNotNull { it.second.toDoubleOrNull() }
+        if (numericValues.isEmpty()) return "No data (${values.size} samples)"
+
+
+
+        val config = TextDisplay.Companion.LinePlotConfig(
+            useBraille = false,
+            interpolate = false,
+            color = "§a", // Minecraft green color code
+            width = width,
+            height = 16,
+            maxValue = (numericValues.maxOrNull() ?: 1.0f).toFloat(),
+        )
+
+        val currentValue = values.lastOrNull()?.second ?: "No data"
+        return buildString {
+            append("$currentValue (${values.size} samples)\n\n")
+            append(TextDisplay.linePlot(numericValues, config))
+        }
     }
 
     private fun buildConfigString(): String {

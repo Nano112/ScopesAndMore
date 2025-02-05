@@ -69,6 +69,7 @@ class PanelEditTool(private val panelManager: PanelManager) {
     }
 
     private fun handleToolHeld(player: Player) {
+        activeWidgets.forEach { it.isHovered = false }
         val targetPanel = panelManager.getFirstPanelForPlayer(player)
         if (targetPanel != null) {
             targetPanel.isHovered = true
@@ -84,8 +85,10 @@ class PanelEditTool(private val panelManager: PanelManager) {
         }
         SharedEntityRenderer.render("panel_edit_widgets", group)
 
-        // Update widget hover states
-        findNearestWidget(player)?.onHover()
+        findNearestWidget(player)?.also {
+            it.isHovered = true
+            it.onHover()
+        }
     }
 
     private fun findNearestWidget(player: Player): PanelWidget? {
