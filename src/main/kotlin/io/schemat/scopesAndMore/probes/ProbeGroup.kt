@@ -2,7 +2,10 @@ package io.schemat.scopesAndMore.probes
 
 import io.schemat.scopesAndMore.probe.Probe
 import io.schemat.scopesAndMore.textBackgroundTransform
-import io.schemat.scopesAndMore.utils.heledron.*
+import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntityGroup
+import io.schemat.scopesAndMore.utils.heledron.rendering.blockRenderEntity
+import io.schemat.scopesAndMore.utils.heledron.rendering.interpolateTransform
+import io.schemat.scopesAndMore.utils.heledron.rendering.textRenderEntity
 import org.bukkit.*
 import org.bukkit.entity.Display
 import org.bukkit.entity.Player

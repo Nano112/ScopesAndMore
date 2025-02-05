@@ -4,10 +4,10 @@ import io.schemat.scopesAndMore.probe.ProbeUtils
 import io.schemat.scopesAndMore.probes.ProbeGroup
 import io.schemat.scopesAndMore.textBackgroundTransform
 import io.schemat.scopesAndMore.utils.ColorScheme
-import io.schemat.scopesAndMore.utils.heledron.RenderEntityGroup
-import io.schemat.scopesAndMore.utils.heledron.blockRenderEntity
-import io.schemat.scopesAndMore.utils.heledron.interpolateTransform
-import io.schemat.scopesAndMore.utils.heledron.textRenderEntity
+import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntityGroup
+import io.schemat.scopesAndMore.utils.heledron.rendering.blockRenderEntity
+import io.schemat.scopesAndMore.utils.heledron.rendering.interpolateTransform
+import io.schemat.scopesAndMore.utils.heledron.rendering.textRenderEntity
 import org.bukkit.Color
 import org.bukkit.Location
 import org.bukkit.Material

@@ -5,6 +5,10 @@ import io.schemat.scopesAndMore.utils.ButtonState
 import io.schemat.scopesAndMore.utils.ButtonStyle
 import io.schemat.scopesAndMore.utils.MinecraftColor
 import io.schemat.scopesAndMore.utils.heledron.*
+import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntityGroup
+import io.schemat.scopesAndMore.utils.heledron.rendering.blockRenderEntity
+import io.schemat.scopesAndMore.utils.heledron.rendering.interpolateTransform
+import io.schemat.scopesAndMore.utils.heledron.rendering.textRenderEntity
 import org.bukkit.*
 import org.bukkit.entity.Display
 import org.bukkit.entity.Display.Billboard

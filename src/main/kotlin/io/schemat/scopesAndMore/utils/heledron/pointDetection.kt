@@ -1,6 +1,8 @@
 package io.schemat.scopesAndMore.utils.heledron
 
 
+import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntity
+import io.schemat.scopesAndMore.utils.heledron.rendering.SharedEntityRenderer
 import org.bukkit.entity.Interaction
 import org.bukkit.entity.Player
 import org.bukkit.util.Vector
@@ -56,7 +58,8 @@ class PlanePointDetector(
                 it.interactionHeight = player.height.toFloat()
                 it.scoreboardTags.add("plane_point_detector")
             },
-        ))
+        )
+        )
 
         ClickDetectionResult(player, didClick[player] ?: false)
     }

@@ -3,19 +3,19 @@ package io.schemat.scopesAndMore.probe
 import io.schemat.scopesAndMore.textBackgroundTransform
 import io.schemat.scopesAndMore.utils.ui.*
 import io.schemat.scopesAndMore.utils.*
-import io.schemat.scopesAndMore.utils.heledron.*
+import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntityGroup
+import io.schemat.scopesAndMore.utils.heledron.rendering.blockRenderEntity
+import io.schemat.scopesAndMore.utils.heledron.rendering.interpolateTransform
+import io.schemat.scopesAndMore.utils.heledron.rendering.textRenderEntity
 import org.bukkit.*
 import org.bukkit.entity.Display
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.block.data.Lightable
 import org.bukkit.block.data.Powerable
-import org.bukkit.block.data.type.RedstoneWallTorch
 import org.bukkit.block.data.type.RedstoneWire
 import org.bukkit.entity.Player
-import org.bukkit.util.Vector
 import org.joml.Matrix4f
-import org.joml.Quaternionf
 import java.util.UUID
 
 class Probe(

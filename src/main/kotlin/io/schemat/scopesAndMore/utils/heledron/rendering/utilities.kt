@@ -1,4 +1,4 @@
-package io.schemat.scopesAndMore.utils.heledron
+package io.schemat.scopesAndMore.utils.heledron.rendering
 
 
 import org.bukkit.entity.Display

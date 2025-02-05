@@ -1,6 +1,9 @@
-package io.schemat.scopesAndMore.utils.heledron
+package io.schemat.scopesAndMore.utils.heledron.rendering
 
 
+import io.schemat.scopesAndMore.utils.heledron.onDisablePlugin
+import io.schemat.scopesAndMore.utils.heledron.onTickEnd
+import io.schemat.scopesAndMore.utils.heledron.spawnEntity
 import org.bukkit.Location
 import org.bukkit.World
 import org.bukkit.entity.BlockDisplay
@@ -209,11 +212,11 @@ object SharedEntityRenderer {
     private var group = RenderEntityGroup()
 
     fun render(id: Any, group: RenderEntityGroup) {
-        this.group.add(id, group)
+        SharedEntityRenderer.group.add(id, group)
     }
 
     fun render(id: Any, entity: RenderEntity<out Entity>) {
-        this.group.add(id, entity)
+        group.add(id, entity)
     }
 
     fun flush() {

@@ -2,7 +2,7 @@ package io.schemat.scopesAndMore.scopes
 
 import io.schemat.scopesAndMore.probe.ProbeUtils
 import io.schemat.scopesAndMore.probes.ProbeGroup
-import io.schemat.scopesAndMore.utils.heledron.RenderEntityGroup
+import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntityGroup
 import org.bukkit.Color
 import org.bukkit.Location
 import org.bukkit.block.BlockFace

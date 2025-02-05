@@ -6,10 +6,15 @@ import io.schemat.scopesAndMore.listeners.RedstoneListener
 import io.schemat.scopesAndMore.probe.ProbeManager
 import io.schemat.scopesAndMore.probes.ProbeGroupManager
 import io.schemat.scopesAndMore.scopes.ScopeManager
-import io.schemat.scopesAndMore.utils.heledron.SharedEntityRenderer
+import io.schemat.scopesAndMore.utils.gui.PanelCreationTool
+import io.schemat.scopesAndMore.utils.gui.PanelEditTool
+import io.schemat.scopesAndMore.utils.gui.PanelManager
+import io.schemat.scopesAndMore.utils.heledron.rendering.SharedEntityRenderer
 import io.schemat.scopesAndMore.utils.heledron.currentPlugin
 import io.schemat.scopesAndMore.utils.heledron.onTick
+import io.schemat.scopesAndMore.utils.heledron.openCustomItemInventory
 import kotlinx.coroutines.runBlocking
+import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.joml.Matrix4f
 
@@ -26,17 +31,20 @@ class ScopesAndMore : JavaPlugin() {
     private lateinit var probeManager: ProbeManager
     private lateinit var probeGroupManager: ProbeGroupManager
     private lateinit var scopeManager: ScopeManager
+    private lateinit var panelManager: PanelManager
 
 
     // Expose probeManager through a getter
     fun getProbeManager() = probeManager
     fun getProbeGroupManager() = probeGroupManager
     fun getScopeManager() = scopeManager
+    fun getPanelManager() = panelManager
 
     companion object {
         lateinit var instance: ScopesAndMore
             private set
     }
+
 
 
     override fun onEnable() {
@@ -50,10 +58,14 @@ class ScopesAndMore : JavaPlugin() {
         // Initialize WorldEdit instance
         worldEditInstance = WorldEdit.getInstance()
 
-        // Initialize probe system
+
+
         probeManager = ProbeManager()
         probeGroupManager = ProbeGroupManager()
         scopeManager = ScopeManager()
+        panelManager = PanelManager()
+        PanelCreationTool(panelManager)
+        PanelEditTool(panelManager)
         setupProbeSystem()
 
         // Check connection on plugin enable
@@ -71,6 +83,14 @@ class ScopesAndMore : JavaPlugin() {
             command.tabCompleter = probeCommands
         }
 
+        getCommand("scope-items")?.setExecutor { sender, _, _, _ ->
+            openCustomItemInventory(sender as? Player ?: run {
+                sender.sendMessage("Only players can use this command")
+                return@setExecutor true
+            })
+            true
+        }
+
         // Register redstone listener
         server.pluginManager.registerEvents(
             RedstoneListener(probeManager),
@@ -83,6 +103,7 @@ class ScopesAndMore : JavaPlugin() {
             SharedEntityRenderer.render(this to "probes", probeManager.render(players))
             SharedEntityRenderer.render(this to "probe_groups", probeGroupManager.render(players))
             SharedEntityRenderer.render(this to "scopes", scopeManager.render(players))
+            SharedEntityRenderer.render(this to "panels", panelManager.render(players))
         }
 
         logger.info("Probe system initialized")
