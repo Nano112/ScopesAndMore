@@ -8,52 +8,91 @@ import org.bukkit.entity.Display
 import org.bukkit.entity.Player
 import org.bukkit.util.Vector
 import org.joml.Matrix4f
+import org.joml.Vector4f
 
 interface PanelWidget {
     val id: String
     val panel: Panel
     val position: Vector
-    val selectionRadius: Double  // How close player needs to be to select this widget
+    val selectionRadius: Double
     var isHovered: Boolean
     var isSelected: Boolean
 
-    // Called every tick while widget is visible
     fun render(group: RenderEntityGroup)
-
-    // Called when player's raycast intersects within selectionRadius of widget position
     fun onHover()
-
-    // Called when player clicks while hovering
     fun onSelect()
-
-    // Called when widget is deselected (by clicking elsewhere or switching tools)
     fun onDeselect()
-
-    // Optional: Called every tick while widget is selected
     fun onSelectedTick(player: Player) {}
 }
 
-// Example implementation for move widget
-class PanelMoveWidget(
+
+
+abstract class BasePanelWidget(
     override val panel: Panel,
-    override val selectionRadius: Double = 0.5
+    override val selectionRadius: Double,
+    protected val blockSize: Float = 0.15f
 ) : PanelWidget {
-    override val id = "move_widget"
-    override val position get() = panel.calculateCenter()
     override var isSelected = false
     override var isHovered = false
-    private var dragStartPosition: Vector? = null
+    protected var dragStartPosition: Vector? = null
+    override fun onSelect() {
+        isSelected = true
+        dragStartPosition = position.clone()
+        onSelectionChanged(true)
+    }
+
+    override fun onDeselect() {
+        isSelected = false
+        dragStartPosition = null
+        onSelectionChanged(false)
+    }
+
+    protected open fun onSelectionChanged(selected: Boolean) {}
+
+    protected fun calculateBlockOrientation(): Triple<Vector, Vector, Vector> {
+        val normal = panel.calculateNormal()
+        val worldUp = Vector(0, 1, 0)
+        val right = if (Math.abs(normal.dot(worldUp)) > 0.99) {
+            normal.getCrossProduct(Vector(0, 0, 1)).normalize()
+        } else {
+            normal.getCrossProduct(worldUp).normalize()
+        }
+        val up = normal.getCrossProduct(right).normalize()
+        return Triple(right, up, normal)
+    }
+
+    override fun onHover() {} // Default empty implementation
+}
+
+class PanelMoveWidget(
+    panel: Panel,
+    selectionRadius: Double = 0.5,
+    blockSize: Float = 0.2f
+) : BasePanelWidget(panel, selectionRadius, blockSize) {
+    override val id = "move_widget"
+    override val position: Vector get() = panel.localToWorld(Vector4f(0.5f, 0.5f, 0.25f, 1f))
     private var panelStartCorners: List<Location>? = null
 
+
+    private fun getBlockPosition(): Vector {
+        val width = panel.calculateDimensions().first
+        val height = panel.calculateDimensions().second
+        if (width.isNaN() || height.isNaN()) return Vector(Double.NaN, Double.NaN, Double.NaN)
+        if (width == 0.0 || height == 0.0) return Vector(Double.NaN, Double.NaN, Double.NaN)
+        val offset = Vector4f(
+            -blockSize/2.0f,
+            -blockSize/2.0f,
+            -blockSize/2.0f,
+            1.0f
+        )
+
+        return panel.localToWorld(Vector4f(0.5f, 0.5f, 0.25f, 1f).add(offset))
+    }
     override fun render(group: RenderEntityGroup) {
-        val normal = panel.calculateNormal()
-        val up = Vector(0, 1, 0)
-        val rotationAxis = up.getCrossProduct(normal).normalize()
-        val angle = up.angle(normal)
-        // Center handle
+        if (position.x.isNaN() || position.y.isNaN() || position.z.isNaN()) return
         group.add("$id.center", blockRenderEntity(
             world = panel.corners[0].world!!,
-            position = position,
+            position = getBlockPosition(),
             init = {
                 it.block = when {
                     isSelected -> Material.DIAMOND_BLOCK.createBlockData()
@@ -63,15 +102,7 @@ class PanelMoveWidget(
                 it.brightness = Display.Brightness(15, 15)
             },
             update = {
-                it.setTransformationMatrix(
-                    Matrix4f().scale(0.2f).translate(0f, 0f, -1f)
-                        .rotate(
-                            angle.toFloat(),
-                            rotationAxis.x.toFloat(),
-                            rotationAxis.y.toFloat(),
-                            rotationAxis.z.toFloat()
-                        )
-                )
+                it.setTransformationMatrix(panel.getBasisTransform().scale(blockSize))
                 it.block = when {
                     isSelected -> Material.DIAMOND_BLOCK.createBlockData()
                     isHovered -> Material.IRON_BLOCK.createBlockData()
@@ -79,81 +110,61 @@ class PanelMoveWidget(
                 }
             }
         ))
-
-        // Normal direction indicator
-//        group.add("$id.normal", blockRenderEntity(
-//            world = panel.corners[0].world!!,
-//            position = position,
-//            init = {
-//                it.block = Material.EMERALD_BLOCK.createBlockData()
-//                it.brightness = Display.Brightness(15, 15)
-//            },
-//            update = {
-//
-//
-//                it.setTransformationMatrix(
-//                    Matrix4f()
-//                        .translate(0f, 0f, 0f)
-//                        .rotate(
-//                            angle.toFloat(),
-//                            rotationAxis.x.toFloat(),
-//                            rotationAxis.y.toFloat(),
-//                            rotationAxis.z.toFloat()
-//                        )
-//                        .scale(0.1f, 1.0f, 0.1f)
-//                )
-//            }
-//        ))
     }
 
-    override fun onHover() {
-        // Could show tooltip or highlight
-    }
-
-    override fun onSelect() {
-        isSelected = true
-        dragStartPosition = position.clone()
-        panelStartCorners = panel.corners.map { it.clone() }
-    }
-
-    override fun onDeselect() {
-        isSelected = false
-        dragStartPosition = null
-        panelStartCorners = null
+    override fun onSelectionChanged(selected: Boolean) {
+        panelStartCorners = if (selected) panel.corners.map { it.clone() } else null
     }
 
     override fun onSelectedTick(player: Player) {
         if (dragStartPosition == null || panelStartCorners == null) return
-
-        // Calculate movement delta from drag start
-        val playerLook = player.location.direction
-        val targetPos =
-            player.eyeLocation.toVector().add(playerLook.multiply(position.distance(player.eyeLocation.toVector())))
+        val targetPos = calculateDragTarget(player)
         val delta = targetPos.subtract(dragStartPosition!!)
+        panel.corners = panelStartCorners!!.map { it.clone().add(delta) }
+    }
 
-        // Apply movement to all corners
-        panel.corners = panelStartCorners!!.mapIndexed { index, corner ->
-            corner.clone().add(delta)
-        }
+    private fun calculateDragTarget(player: Player): Vector {
+        val playerLook = player.location.direction
+        return player.eyeLocation.toVector().add(playerLook.multiply(position.distance(player.eyeLocation.toVector())))
     }
 }
 
-// Example implementation for corner resize widget
 class PanelCornerWidget(
-    override val panel: Panel,
+    panel: Panel,
     private val cornerIndex: Int,
-    override val selectionRadius: Double = 0.3
-) : PanelWidget {
+    selectionRadius: Double = 0.3,
+    blockSize: Float = 0.15f
+) : BasePanelWidget(panel, selectionRadius, blockSize) {
     override val id = "corner_widget_$cornerIndex"
-    override val position get() = panel.corners[cornerIndex].toVector()
-    override var isSelected = false
-    override var isHovered = false
-    private var dragStartPosition: Vector? = null
+
+    override val position: Vector get() {
+        val x = if (cornerIndex == 1 || cornerIndex == 2) 1.0f else 0.0f
+        val y = if (cornerIndex == 2 || cornerIndex == 3) 1.0f else 0.0f
+        return panel.localToWorld(Vector4f(x, y, 0f, 1f))
+    }
+
+    private fun getBlockPosition(): Vector{
+        val x = if (cornerIndex == 1 || cornerIndex == 2) 1.0f else 0.0f
+        val y = if (cornerIndex == 2 || cornerIndex == 3) 1.0f else 0.0f
+        val (width, height) = panel.calculateDimensions()
+        if (width.isNaN() || height.isNaN()) return Vector(Double.NaN, Double.NaN, Double.NaN)
+        if (width == 0.0 || height == 0.0) return Vector(Double.NaN, Double.NaN, Double.NaN)
+        val offset = Vector4f(
+            if (x < 0.5f) blockSize/width.toFloat() else 0.0f,
+            if (y < 0.5f) blockSize/height.toFloat() else 0.0f,
+            -blockSize/2.0f,
+            1.0f
+        )
+
+        return panel.localToWorld(Vector4f(x, y, 0f, 1f).add(offset))
+    }
 
     override fun render(group: RenderEntityGroup) {
+        val blockPos = getBlockPosition()
+        if (blockPos.x.isNaN() || blockPos.y.isNaN() || blockPos.z.isNaN()) return
         group.add(id, blockRenderEntity(
             world = panel.corners[0].world!!,
-            position = position,
+            position = blockPos,
             init = {
                 it.block = when {
                     isSelected -> Material.DIAMOND_BLOCK.createBlockData()
@@ -163,7 +174,7 @@ class PanelCornerWidget(
                 it.brightness = Display.Brightness(15, 15)
             },
             update = {
-                it.setTransformationMatrix(Matrix4f().scale(0.15f))
+                it.setTransformationMatrix(panel.getBasisTransform().scale(blockSize))
                 it.block = when {
                     isSelected -> Material.DIAMOND_BLOCK.createBlockData()
                     isHovered -> Material.IRON_BLOCK.createBlockData()
@@ -173,36 +184,38 @@ class PanelCornerWidget(
         ))
     }
 
-    override fun onHover() {}
 
-    override fun onSelect() {
-        isSelected = true
-        dragStartPosition = position.clone()
+
+    override fun onSelectionChanged(selected: Boolean) {
+        dragStartPosition = if (selected) position.clone() else null
     }
 
-    override fun onDeselect() {
-        isSelected = false
-        dragStartPosition = null
-    }
+
 
     override fun onSelectedTick(player: Player) {
         if (!isSelected || dragStartPosition == null) return
 
-        val playerLook = player.location.direction
-        val targetPos = player.eyeLocation.toVector().add(playerLook.multiply(position.distance(player.eyeLocation.toVector())))
+        val targetPos = calculateDragTarget(player)
         val targetLocation = targetPos.toLocation(panel.corners[0].world!!)
-
-        // Get diagonal corner index (0→2, 1→3, 2→0, 3→1)
         val diagonalIndex = (cornerIndex + 2) % 4
-        val newCorners = Panel.generatePanelCorners(targetLocation, panel.corners[diagonalIndex], cornerIndex%2 == 1)
+        val isFlipped = cornerIndex % 2 == 1
+        val newCorners = Panel.generatePanelCorners(targetLocation, panel.corners[diagonalIndex], isFlipped)
+        val width = newCorners[0].distance(newCorners[1])
+        val height = newCorners[0].distance(newCorners[3])
+        if (width < 0.2 || height < 0.2) return
 
-        // Update panel corners but keep the diagonal corner in place
+        println("Width: $width, Height: $height")
         panel.corners = panel.corners.mapIndexed { index, corner ->
-            if (index == cornerIndex) newCorners[cornerIndex]
-            else if (index == diagonalIndex) corner
-            else newCorners[index]
+            when (index) {
+                cornerIndex -> newCorners[cornerIndex]
+                diagonalIndex -> corner
+                else -> newCorners[index]
+            }
         }
+    }
 
-
+    private fun calculateDragTarget(player: Player): Vector {
+        val playerLook = player.location.direction
+        return player.eyeLocation.toVector().add(playerLook.multiply(position.distance(player.eyeLocation.toVector())))
     }
 }

@@ -22,6 +22,7 @@ data class TimeSeriesScopeSettings(
     override val valueScale: Float = 0.05f,
     override val labelScale: Float = 0.15f,
     override val backgroundColor: Color = ColorScheme.background.apply { alpha = 200 },
+    val maxWidth: Int = 30,
     val lookbackSeconds: Int = 10,
     val updateIntervalTicks: Int = 2,
     val lineColor: Color = Color.GREEN,
@@ -81,6 +82,7 @@ class TimeSeriesScope(
             world = location.world!!,
             position = location.toVector(),
             init = {
+                it.lineWidth = getWidth() * 10
                 it.text = buildValueString()
                 it.backgroundColor = settings.backgroundColor
                 it.brightness = Display.Brightness(15, 15)
@@ -92,7 +94,7 @@ class TimeSeriesScope(
                     .translate(x, y, z)
                     .scale(settings.valueScale)
                     .translate(-0.5f, -0.5f, 0.0f)
-                it.interpolateTransform(transform.mul(textBackgroundTransform))
+                it.interpolateTransform(transform.mul(textBackgroundTransform).scale(0.5f, 1.0f, 1.0f))
             }
         ))
 
@@ -119,11 +121,16 @@ class TimeSeriesScope(
         return group
     }
 
-    private fun buildValueString(): String {
+
+    fun getWidth(): Int {
         val samplesPerSecond = 20 / settings.updateIntervalTicks
-        val expectedSamples = (settings.lookbackSeconds * samplesPerSecond).toInt()
-        val width = minOf(expectedSamples, 30) // Cap at 30 chars wide
-        val numericValues = values.takeLast(width).mapNotNull { it.second.toDoubleOrNull() }
+        val expectedSamples = settings.lookbackSeconds * samplesPerSecond
+        println("Expected samples: $expectedSamples")
+        return minOf(expectedSamples, settings.maxWidth)
+    }
+
+    private fun buildValueString(): String {
+        val numericValues = values.takeLast(getWidth()).mapNotNull { it.second.toDoubleOrNull() }
         if (numericValues.isEmpty()) return "No data (${values.size} samples)"
 
 
@@ -132,14 +139,14 @@ class TimeSeriesScope(
             useBraille = false,
             interpolate = false,
             color = "§a", // Minecraft green color code
-            width = width,
+            width = getWidth(),
             height = 16,
             maxValue = (numericValues.maxOrNull() ?: 1.0f).toFloat(),
         )
 
-        val currentValue = values.lastOrNull()?.second ?: "No data"
+        val currentValue = numericValues.last()
         return buildString {
-            append("$currentValue (${values.size} samples)\n\n")
+            append("$currentValue (${numericValues.size} samples)\n")
             append(TextDisplay.linePlot(numericValues, config))
         }
     }

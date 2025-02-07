@@ -1,8 +1,9 @@
 package io.schemat.scopesAndMore.utils.gui
 
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.roundToInt
-
+data class ColoredChar(val color: String, val char: Char)
 
 data class BrailleCharacter(val dots: Array<BooleanArray> = Array(4) { BooleanArray(2) }) {
     fun toBraille(): Char {
@@ -51,7 +52,8 @@ class TextDisplay {
         data class LinePlotConfig(
             val useBraille: Boolean = false,
             val interpolate: Boolean = false,
-            val color: String? = null,
+            val color: String = "§a",
+            val backgroundColor: String = "§0",
             val width: Int = 30,
             val height: Int = 5,
             val maxValue: Float = 16.0f,
@@ -92,37 +94,57 @@ class TextDisplay {
         }
 
         private fun simplePlot(values: List<Number>, config: LinePlotConfig): String {
-            val canvas = Array(config.height) { CharArray(config.width) { '\u2003' } }
-            val min = values.minOf { it.toDouble() }
-            val max = values.maxOf { it.toDouble() }
-            val range = max - min
+            val canvas = Array(config.height) { Array(config.width) { ColoredChar(config.backgroundColor, '█') } }
 
-            if (config.interpolate) {
-                for (i in 0 until values.size - 1) {
-                    val x1 = (i.toDouble() / (values.size - 1) * (config.width - 1)).toInt()
-                    val x2 = ((i + 1).toDouble() / (values.size - 1) * (config.width - 1)).toInt()
-                    val y1 = ((values[i].toDouble() - min) / range * (config.height - 1)).toInt()
-                    val y2 = ((values[i + 1].toDouble() - min) / range * (config.height - 1)).toInt()
-                    drawSimpleLine(canvas, x1, y1, x2, y2)
+            // Handle empty values list
+            if (values.isEmpty()) {
+                return canvas.joinToString("\n") { row ->
+                    row.joinToString("") { it.color + it.char }
+                }
+            }
+
+            if (config.maxValue == config.minValue) {
+                // Draw horizontal line in the middle if the range is zero
+                val middleY = config.height / 2
+                values.forEachIndexed { i, _ ->
+                    if (i < config.width) {
+                        canvas[config.height - 1 - middleY][i] = ColoredChar(config.color, '█')
+                    }
                 }
             } else {
-                val dx = config.width.toDouble() / values.size  // Space between points
-
-
-                values.forEachIndexed { i, value ->
-                    val x = (i * dx).toInt()
-                    val normalizedValue = value.toDouble().coerceIn(config.minValue.toDouble(),
-                        config.maxValue.toDouble()
-                    )
-                    val y = ((normalizedValue - config.minValue) / (config.maxValue - config.minValue) * (config.height - 1)).roundToInt()
-                    if (y in canvas.indices && x in canvas[0].indices) {
-                        canvas[canvas.size - 1 - y][x] = '█'
+                if (config.interpolate) {
+                    for (i in 0 until values.size - 1) {
+                        val x1 = (i.toDouble() / (values.size - 1) * (config.width - 1)).toInt()
+                        val x2 = ((i + 1).toDouble() / (values.size - 1) * (config.width - 1)).toInt()
+                        val y1 = ((values[i].toDouble() - config.minValue) / (config.maxValue - config.minValue) * (config.height - 1)).toInt()
+                        val y2 = ((values[i + 1].toDouble() - config.minValue) / (config.maxValue - config.minValue) * (config.height - 1)).toInt()
+                        drawSimpleLine(canvas, x1, y1, x2, y2)
+                    }
+                } else {
+                    values.forEachIndexed { i, value ->
+                        val x = i
+                        if (x < config.width) {  // Ensure we don't exceed canvas width
+                            try {
+                                val normalizedValue = value.toDouble().coerceIn(config.minValue.toDouble(), config.maxValue.toDouble())
+                                val yRatio = (normalizedValue - config.minValue) / (config.maxValue - config.minValue)
+                                if (!yRatio.isNaN()) {  // Check for NaN before calculations
+                                    val y = ceil(yRatio * (config.height - 1)).roundToInt()
+                                    if (y in canvas.indices) {
+                                        canvas[canvas.size - 1 - y][x] = ColoredChar(config.color, '█')
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // Skip invalid values silently
+                            }
+                        }
                     }
                 }
             }
 
-            val result = canvas.joinToString("\n") { it.joinToString("") }
-            return config.color?.let { "$it$result§r" } ?: result
+            val result = canvas.joinToString("\n") { row ->
+                row.joinToString("") { it.color + it.char }
+            }
+            return "$result§r"
         }
 
         private fun drawBrailleLine(canvas: Canvas, x1: Int, y1: Int, x2: Int, y2: Int) {
@@ -138,7 +160,7 @@ class TextDisplay {
             }
         }
 
-        private fun drawSimpleLine(canvas: Array<CharArray>, x1: Int, y1: Int, x2: Int, y2: Int) {
+        private fun drawSimpleLine(canvas: Array<Array<ColoredChar>>, x1: Int, y1: Int, x2: Int, y2: Int) {
             val dx = x2 - x1
             val dy = y2 - y1
             val steps = maxOf(abs(dx), abs(dy))
@@ -148,7 +170,7 @@ class TextDisplay {
                 val x = (x1 + dx * t).toInt()
                 val y = canvas.size - 1 - (y1 + dy * t).toInt()
                 if (y in canvas.indices && x in canvas[0].indices) {
-                    canvas[y][x] = '█'
+                    canvas[y][x] = ColoredChar("§b", '█')
                 }
             }
         }

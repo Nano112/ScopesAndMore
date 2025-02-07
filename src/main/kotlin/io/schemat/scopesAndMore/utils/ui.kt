@@ -102,7 +102,7 @@ data class TextStyle(
 
 // Helper object for common color combinations
 object ColorScheme {
-    val background = Color.fromRGB(30, 30, 30)
+    val background = Color.fromRGB(0, 0, 0)
     val primary = Color.fromRGB(0, 122, 255)
     val success = Color.fromRGB(52, 199, 89)
     val warning = Color.fromRGB(255, 149, 0)

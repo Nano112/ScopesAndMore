@@ -12,6 +12,9 @@ import org.bukkit.entity.Player
 import org.bukkit.util.Vector
 import org.joml.Matrix4f
 import org.joml.Vector4f
+import java.awt.Font
+import java.awt.font.FontRenderContext
+import java.awt.font.TextLayout
 import java.util.*
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -19,22 +22,34 @@ import kotlin.math.sqrt
 const val cellSize = 0.125f
 
 class Panel(
-    //        corner 1 will be bottom left
-    //        corner 2 will be bottom right
-    //        corner 3 will be top right
-    //        corner 4 will be top left
     var corners: List<Location>,
     val id: UUID = UUID.randomUUID(),
     val name: String = "",
     var backgroundColor: Color = Color.fromRGB(255, 0, 255),
     var hoverColor: Color = Color.fromRGB(0, 255, 255),
     var isHovered: Boolean = false
-
-
-    ) {
+) {
     init {
         require(corners.size == 4) { "Panel must be defined by exactly 4 corners" }
         require(corners.all { it.world == corners[0].world }) { "All corners must be in the same world" }
+    }
+
+    fun getBasisTransform(): Matrix4f {
+        val normal = calculateNormal()
+        val worldUp = Vector(0, 1, 0)
+        val right = if (Math.abs(normal.dot(worldUp)) > 0.99) {
+            normal.getCrossProduct(Vector(0, 0, 1)).normalize()
+        } else {
+            normal.getCrossProduct(worldUp).normalize()
+        }
+        val up = normal.getCrossProduct(right).normalize()
+
+        return Matrix4f(
+            right.x.toFloat(), up.x.toFloat(), normal.x.toFloat(), 0f,
+            right.y.toFloat(), up.y.toFloat(), normal.y.toFloat(), 0f,
+            right.z.toFloat(), up.z.toFloat(), normal.z.toFloat(), 0f,
+            0f, 0f, 0f, 1f
+        )
     }
 
     fun calculateCenter(): Vector {
@@ -50,110 +65,46 @@ class Panel(
         return edge1.getCrossProduct(edge2).normalize()
     }
 
-    fun rayIntersectsPanel(rayOrigin: Vector, rayDirection: Vector, maxDistance: Double = 100.0): Double? {
-        val normal = calculateNormal()
-        val point = corners[0].toVector()
-
-        // Calculate denominator for intersection check
-        val denominator = normal.dot(rayDirection)
-
-        // If denominator is close to 0, ray is parallel to panel
-        if (Math.abs(denominator) < 0.0001) {
-            return null
-        }
-
-        // Calculate distance along ray to intersection point
-        val t = (normal.dot(point.subtract(rayOrigin))) / denominator
-
-        // If t is negative or beyond maxDistance, intersection is invalid
-        if (t < 0 || t > maxDistance) {
-            return null
-        }
-
-        // Calculate intersection point
-        val intersection = rayOrigin.clone().add(rayDirection.clone().multiply(t))
-
-        // Check if intersection point is within panel bounds
-        val bottomEdge = corners[1].toVector().subtract(corners[0].toVector())
-        val leftEdge = corners[3].toVector().subtract(corners[0].toVector())
-        val relativePoint = intersection.subtract(corners[0].toVector())
-
-        // Project relative point onto edges
-        val projBottom = relativePoint.dot(bottomEdge) / bottomEdge.lengthSquared()
-        val projLeft = relativePoint.dot(leftEdge) / leftEdge.lengthSquared()
-
-        // Check if projection is within bounds (0 to 1 for both axes)
-        return if (projBottom in 0.0..1.0 && projLeft in 0.0..1.0) t else null
+    fun calculateDimensions(): Pair<Double, Double> {
+        val width = corners[0].distance(corners[1])
+        val height = corners[0].distance(corners[3])
+        return Pair(width, height)
     }
 
-
-
-    private fun calculateDimensions(): Pair<Double, Double> {
-        // Calculate width (distance between corners 1 and 2)
-        val width = corners[0].distance(corners[1])
-
-        // Calculate height (distance between corners 1 and 4)
-        val height = corners[0].distance(corners[3])
-
-        return Pair(width, height)
+    fun getStringWidth(text: String): Float {
+        val fontFile = object {}.javaClass.getResource("/minecraft-unicode.ttf")?.openStream()
+        if ( fontFile == null) {
+            println("Font file not found")
+            return 0f
+        }
+        val font = Font.createFont(Font.TRUETYPE_FONT, fontFile).deriveFont(24f)
+        val frc = FontRenderContext(null, true, true)
+        val layout = TextLayout(text, font, frc)
+        return layout.advance
     }
 
     fun createRenderGroup(): RenderEntityGroup {
         val group = RenderEntityGroup()
         if (corners[0] == corners[2]) return group
-        // Debug: Render corner markers to verify positions
-//        corners.forEachIndexed { index, corner ->
-//            group.add("corner_$index", blockRenderEntity(
-//                world = corner.world!!,
-//                position = corner.toVector(),
-//                init = {
-//                    it.block = Material.GRAY_STAINED_GLASS.createBlockData()
-//                    it.brightness = Display.Brightness(15, 15)
-//                },
-//                update = {
-//                    it.setTransformationMatrix(Matrix4f().scale(0.1f))
-//                }
-//            ))
-//        }
 
-        // Add normal indicator
-        val center = calculateCenter()
-        val normal = calculateNormal()
-//
-//        group.add("normal", blockRenderEntity(
-//            world = corners[0].world!!,
-//            position = center,
-//            init = {
-//                it.block = Material.GOLD_BLOCK.createBlockData()
-//                it.brightness = Display.Brightness(15, 15)
-//            },
-//            update = {
-//                val up = Vector(0, 1, 0)
-//                val rotationAxis = up.getCrossProduct(normal).normalize()
-//                val angle = up.angle(normal)
-//
-//                it.setTransformationMatrix(
-//                    Matrix4f()
-//                        .translate(0f, 0f, 0f)
-//                        .rotate(angle.toFloat(), rotationAxis.x.toFloat(), rotationAxis.y.toFloat(), rotationAxis.z.toFloat())
-//                        .scale(0.1f, 2.0f, 0.1f)
-//                )
-//            }
-//        ))
-
-        // Add panel background using text entity
-        val (width, height) = calculateDimensions()
-
-        // Get the bottom and left edges for correct orientation
+        var (width, height) = calculateDimensions()
         val bottomEdge = corners[1].toVector().subtract(corners[0].toVector()).normalize()
         val upEdge = corners[3].toVector().subtract(corners[0].toVector()).normalize()
+        val normal = calculateNormal()
+
+        if (width < 0.1 || height < 0.1) return group
+
+        val content = "ABC\nDEF\nGHI\nJKL\nMNO\nPQR\nSTU\nVWX\nYZ"
+        val singleSpaceConstant = 16.60546875
+        val longestLineWidth = getStringWidth(content) / singleSpaceConstant
+        val lineCount = content.lines().size
 
         group.add("background", textRenderEntity(
             world = corners[0].world!!,
             position = corners[0].toVector(),
             init = {
-                it.text = " "
-                it.backgroundColor = backgroundColor  // Light blue color with some transparency
+                it.text = content
+                it.backgroundColor = backgroundColor
                 it.brightness = Display.Brightness(15, 15)
             },
             update = {
@@ -164,16 +115,11 @@ class Panel(
                     0f, 0f, 0f, 1f
                 ).transpose()
 
-                if (isHovered) {
-                    it.backgroundColor = hoverColor
-                } else {
-                    it.backgroundColor = backgroundColor
-                }
-
+                it.backgroundColor = if (isHovered) hoverColor else backgroundColor
                 it.setTransformationMatrix(
                     Matrix4f()
                         .mul(rotationMatrix)
-                        .scale(width.toFloat(), height.toFloat(), 1f)
+                        .scale((width.toFloat() / longestLineWidth).toFloat(), height.toFloat() / lineCount, 1f)
                         .mul(textBackgroundTransform)
                 )
                 isHovered = false
@@ -182,9 +128,62 @@ class Panel(
         return group
     }
 
+
+    fun rayIntersectsPanel(rayOrigin: Vector, rayDirection: Vector, maxDistance: Double = 100.0): Double? {
+        val normal = calculateNormal()
+        val point = corners[0].toVector()
+        val denominator = normal.dot(rayDirection)
+
+        if (Math.abs(denominator) < 0.0001) return null
+
+        val t = (normal.dot(point.subtract(rayOrigin))) / denominator
+        if (t < 0 || t > maxDistance) return null
+
+        val intersection = rayOrigin.clone().add(rayDirection.clone().multiply(t))
+        val bottomEdge = corners[1].toVector().subtract(corners[0].toVector())
+        val leftEdge = corners[3].toVector().subtract(corners[0].toVector())
+        val relativePoint = intersection.subtract(corners[0].toVector())
+
+        val projBottom = relativePoint.dot(bottomEdge) / bottomEdge.lengthSquared()
+        val projLeft = relativePoint.dot(leftEdge) / leftEdge.lengthSquared()
+
+        return if (projBottom in 0.0..1.0 && projLeft in 0.0..1.0) t else null
+    }
+
+
+    fun calculateTransformMatrix(): Matrix4f {
+        val bottomEdge = corners[1].toVector().subtract(corners[0].toVector()).normalize()
+        val upEdge = corners[3].toVector().subtract(corners[0].toVector()).normalize()
+        val normal = calculateNormal()
+
+        return Matrix4f(
+            bottomEdge.x.toFloat(), upEdge.x.toFloat(), normal.x.toFloat(), corners[0].x.toFloat(),
+            bottomEdge.y.toFloat(), upEdge.y.toFloat(), normal.y.toFloat(), corners[0].y.toFloat(),
+            bottomEdge.z.toFloat(), upEdge.z.toFloat(), normal.z.toFloat(), corners[0].z.toFloat(),
+            0f, 0f, 0f, 1f
+        ).transpose()
+    }
+
+    fun localToWorld(localPos: Vector4f): Vector {
+        val (width, height) = calculateDimensions()
+        val transform = calculateTransformMatrix()
+
+        val scaledPos = Vector4f(
+            localPos.x * width.toFloat(),
+            localPos.y * height.toFloat(),
+            localPos.z,
+            1f
+        )
+
+        transform.transform(scaledPos)
+        return Vector(scaledPos.x.toDouble(), scaledPos.y.toDouble(), scaledPos.z.toDouble())
+    }
+
+
+
     companion object {
         fun generatePanelCorners(first: Location, second: Location, flipped: Boolean = false): List<Location> {
-            if( !flipped) {
+            if (!flipped) {
                 val corner1 = if (first.y < second.y) first else second
                 val corner3 = if (first.y > second.y) first else second
                 val height = corner3.y - corner1.y
@@ -199,9 +198,9 @@ class Panel(
             val corner3 = corner2.clone().apply { y = corner2.y + height }
             return listOf(corner1, corner2, corner3, corner4)
         }
+
+
     }
-
-
 }
 
 
