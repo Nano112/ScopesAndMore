@@ -4,11 +4,13 @@ import io.schemat.scopesAndMore.textBackgroundTransform
 import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntityGroup
 import io.schemat.scopesAndMore.utils.heledron.rendering.blockRenderEntity
 import io.schemat.scopesAndMore.utils.heledron.rendering.textRenderEntity
+import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.entity.Display
 import org.bukkit.entity.Player
+import org.bukkit.entity.TextDisplay
 import org.bukkit.util.Vector
 import org.joml.Matrix4f
 import org.joml.Vector4f
@@ -73,14 +75,29 @@ class Panel(
 
     fun getStringWidth(text: String): Float {
         val fontFile = object {}.javaClass.getResource("/minecraft-unicode.ttf")?.openStream()
-        if ( fontFile == null) {
+        if (fontFile == null) {
             println("Font file not found")
             return 0f
         }
         val font = Font.createFont(Font.TRUETYPE_FONT, fontFile).deriveFont(24f)
         val frc = FontRenderContext(null, true, true)
-        val layout = TextLayout(text, font, frc)
-        return layout.advance
+
+        // Handle spaces specially
+        return text.lines().maxOf { line ->
+            // Count spaces and non-spaces separately
+            val spaceCount = line.count { it == ' ' }
+            val nonSpaceText = line.replace(" ", "")
+
+            // Space width is 4 units in Minecraft
+            val spaceWidth = spaceCount * 4f
+
+            // Get width of non-space characters using regular font metrics
+            val nonSpaceWidth = if (nonSpaceText.isNotEmpty()) {
+                TextLayout(nonSpaceText, font, frc).advance
+            } else 0f
+
+            spaceWidth + nonSpaceWidth
+        }
     }
 
     fun createRenderGroup(): RenderEntityGroup {
@@ -94,11 +111,13 @@ class Panel(
 
         if (width < 0.1 || height < 0.1) return group
 
-        val content = "ABC\nDEF\nGHI\nJKL\nMNO\nPQR\nSTU\nVWX\nYZ"
+        val content = "AAA"
         val singleSpaceConstant = 16.60546875
-        val longestLineWidth = getStringWidth(content) / singleSpaceConstant
-        val lineCount = content.lines().size
+        val stringWidth = getStringWidth(content)
+        val longestLineWidth = stringWidth / singleSpaceConstant
 
+        Bukkit.broadcastMessage("stringWidth: $stringWidth, longestLineWidth: $longestLineWidth")
+        val lineCount = content.lines().size
         group.add("background", textRenderEntity(
             world = corners[0].world!!,
             position = corners[0].toVector(),
@@ -120,6 +139,7 @@ class Panel(
                     Matrix4f()
                         .mul(rotationMatrix)
                         .scale((width.toFloat() / longestLineWidth).toFloat(), height.toFloat() / lineCount, 1f)
+//                        .translate((longestLineWidth / 2f).toFloat(), 0f, 0f)
                         .mul(textBackgroundTransform)
                 )
                 isHovered = false
