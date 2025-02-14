@@ -1,5 +1,6 @@
 package io.schemat.scopesAndMore.utils.gui
 
+import io.schemat.scopesAndMore.apps.PlayerLocationApp
 import io.schemat.scopesAndMore.utils.heledron.*
 import io.schemat.scopesAndMore.utils.heledron.rendering.*
 import org.bukkit.Material
@@ -8,6 +9,7 @@ import org.joml.Matrix4f
 import org.bukkit.Location
 import org.bukkit.entity.Display
 
+const val cellSize = 0.125
 
 class PanelCreationTool(
     private val panelManager: PanelManager,
@@ -49,7 +51,6 @@ class PanelCreationTool(
     }
 
 
-
     private fun renderPointer(player: Player) {
         val lookingAt = getPlayerTargetPosition(player)
         SharedEntityRenderer.render("panel_tool_pointer", blockRenderEntity(
@@ -80,7 +81,22 @@ class PanelCreationTool(
             val corners = Panel.generatePanelCorners(firstCorner!!, firstCorner!!)
             previewPanel = Panel(
                 corners = corners,
-                name = "Unnamed panel"
+                name = "Unnamed panel",
+                app = PlayerLocationApp(player)
+////                app = PlayerStatsApp(player)
+//                app = DualPanelApp(
+//                    DualPanelApp(
+//                        DualPanelApp(
+//                            PlayerLocationApp(player),
+//                            PositionGridApp(player),
+//                            direction = SplitDirection.VERTICAL
+//                        ),
+//                        PlayerVelocityApp(player),
+//                        direction = SplitDirection.VERTICAL
+//                    ),
+//                    PlayerStatsApp(player),
+//
+//                    )
             )
             player.sendMessage("First corner set")
             return

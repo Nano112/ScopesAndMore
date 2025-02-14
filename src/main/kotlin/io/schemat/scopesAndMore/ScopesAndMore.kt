@@ -6,6 +6,7 @@ import io.schemat.scopesAndMore.listeners.RedstoneListener
 import io.schemat.scopesAndMore.probe.ProbeManager
 import io.schemat.scopesAndMore.probes.ProbeGroupManager
 import io.schemat.scopesAndMore.scopes.ScopeManager
+import io.schemat.scopesAndMore.utils.CharacterWidths
 import io.schemat.scopesAndMore.utils.gui.PanelCreationTool
 import io.schemat.scopesAndMore.utils.gui.PanelEditTool
 import io.schemat.scopesAndMore.utils.gui.PanelManager
@@ -52,6 +53,8 @@ class ScopesAndMore : JavaPlugin() {
         currentPlugin = this
         logger.info("ScopesAndMore enabled, loading configuration")
         saveDefaultConfig()
+
+        CharacterWidths.getInstance().initialize(this)
 
         val config = config
 

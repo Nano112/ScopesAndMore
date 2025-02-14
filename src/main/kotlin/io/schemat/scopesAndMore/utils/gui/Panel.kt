@@ -1,6 +1,7 @@
 package io.schemat.scopesAndMore.utils.gui
 
 import io.schemat.scopesAndMore.textBackgroundTransform
+import io.schemat.scopesAndMore.utils.CharacterWidths
 import io.schemat.scopesAndMore.utils.heledron.rendering.RenderEntityGroup
 import io.schemat.scopesAndMore.utils.heledron.rendering.blockRenderEntity
 import io.schemat.scopesAndMore.utils.heledron.rendering.textRenderEntity
@@ -8,6 +9,7 @@ import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.Location
 import org.bukkit.Material
+import org.bukkit.block.Sign
 import org.bukkit.entity.Display
 import org.bukkit.entity.Player
 import org.bukkit.entity.TextDisplay
@@ -21,15 +23,15 @@ import java.util.*
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
-const val cellSize = 0.125f
 
 class Panel(
     var corners: List<Location>,
     val id: UUID = UUID.randomUUID(),
     val name: String = "",
-    var backgroundColor: Color = Color.fromRGB(255, 0, 255),
+    var backgroundColor: Color = Color.fromRGB(0, 0, 0),
     var hoverColor: Color = Color.fromRGB(0, 255, 255),
-    var isHovered: Boolean = false
+    var isHovered: Boolean = false,
+    var app: PanelApp? = null  // Add app property
 ) {
     init {
         require(corners.size == 4) { "Panel must be defined by exactly 4 corners" }
@@ -74,31 +76,33 @@ class Panel(
     }
 
     fun getStringWidth(text: String): Float {
-        val fontFile = object {}.javaClass.getResource("/minecraft-unicode.ttf")?.openStream()
-        if (fontFile == null) {
-            println("Font file not found")
-            return 0f
-        }
-        val font = Font.createFont(Font.TRUETYPE_FONT, fontFile).deriveFont(24f)
-        val frc = FontRenderContext(null, true, true)
+        return text.lines().maxOfOrNull { line ->
+            if (line.isEmpty()) 0f else {
+                // Sum advances for all characters except last one
+                val advanceSum = line.dropLast(1).sumOf { char ->
+                    CharacterWidths.getInstance().getCharacterAdvance(char)
+                }
+                // Add just the width of the last character (no advance needed)
+                val lastCharWidth = CharacterWidths.getInstance().getCharacterWidth(line.last())
 
-        // Handle spaces specially
-        return text.lines().maxOf { line ->
-            // Count spaces and non-spaces separately
-            val spaceCount = line.count { it == ' ' }
-            val nonSpaceText = line.replace(" ", "")
-
-            // Space width is 4 units in Minecraft
-            val spaceWidth = spaceCount * 4f
-
-            // Get width of non-space characters using regular font metrics
-            val nonSpaceWidth = if (nonSpaceText.isNotEmpty()) {
-                TextLayout(nonSpaceText, font, frc).advance
-            } else 0f
-
-            spaceWidth + nonSpaceWidth
-        }
+                (advanceSum + lastCharWidth).toFloat()
+            }
+        } ?: 0f
     }
+
+
+
+//    val textBackgroundTransform: Matrix4f; get() = Matrix4f()
+//        .translate(-0.1f + .5f,-0.5f + .5f,0f)
+//        .scale(8.0f,4.0f,1f) //  + 0.003f  + 0.001f
+    fun createTextBackgroundTransform(pixelWidth: Float): Matrix4f {
+        val horizontalScaling = 4/pixelWidth
+        return Matrix4f()
+            .translate(-0.1f * horizontalScaling + .5f,-0.5f + .5f,0f)
+            .scale(horizontalScaling*40f, 4f, 1f)
+    }
+
+
 
     fun createRenderGroup(): RenderEntityGroup {
         val group = RenderEntityGroup()
@@ -111,22 +115,33 @@ class Panel(
 
         if (width < 0.1 || height < 0.1) return group
 
-        val content = "AAA"
-        val singleSpaceConstant = 16.60546875
-        val stringWidth = getStringWidth(content)
-        val longestLineWidth = stringWidth / singleSpaceConstant
+        val fontSize = 0.5
+        val charWidth = (width / fontSize).toInt()
+        val charHeight = (height / fontSize).toInt()
 
-        Bukkit.broadcastMessage("stringWidth: $stringWidth, longestLineWidth: $longestLineWidth")
+
+        //if the charWidth or charHeight is smaller than 5, return an empty group
+//        if (charWidth < 5 || charHeight < 5) return group
+
+
+        //6 is the average width of a character
+        val advanceWidth = charWidth * 7
+        val content = app?.getContent(advanceWidth, charHeight) ?: " "
+        val stringWidth = getStringWidth(content)
         val lineCount = content.lines().size
         group.add("background", textRenderEntity(
             world = corners[0].world!!,
             position = corners[0].toVector(),
             init = {
+                it.lineWidth = advanceWidth * 80
                 it.text = content
+                it.alignment = TextDisplay.TextAlignment.LEFT
                 it.backgroundColor = backgroundColor
                 it.brightness = Display.Brightness(15, 15)
             },
             update = {
+                it.text = content
+                it.lineWidth = advanceWidth * 80
                 val rotationMatrix = Matrix4f(
                     bottomEdge.x.toFloat(), upEdge.x.toFloat(), normal.x.toFloat(), 0f,
                     bottomEdge.y.toFloat(), upEdge.y.toFloat(), normal.y.toFloat(), 0f,
@@ -138,15 +153,17 @@ class Panel(
                 it.setTransformationMatrix(
                     Matrix4f()
                         .mul(rotationMatrix)
-                        .scale((width.toFloat() / longestLineWidth).toFloat(), height.toFloat() / lineCount, 1f)
-//                        .translate((longestLineWidth / 2f).toFloat(), 0f, 0f)
-                        .mul(textBackgroundTransform)
+                        .scale(width.toFloat(), height.toFloat() / lineCount, 1f)
+                        // Recenter the panel coordinate system: move (0,0) to (0.5, 0.5)
+//                        .translate(0.5f, 0.5f, 0f)
+                        .mul(createTextBackgroundTransform(stringWidth))
                 )
                 isHovered = false
             }
         ))
         return group
     }
+
 
 
     fun rayIntersectsPanel(rayOrigin: Vector, rayDirection: Vector, maxDistance: Double = 100.0): Double? {

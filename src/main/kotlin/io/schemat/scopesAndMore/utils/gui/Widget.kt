@@ -80,13 +80,13 @@ class PanelMoveWidget(
         if (width.isNaN() || height.isNaN()) return Vector(Double.NaN, Double.NaN, Double.NaN)
         if (width == 0.0 || height == 0.0) return Vector(Double.NaN, Double.NaN, Double.NaN)
         val offset = Vector4f(
-            -blockSize/2.0f,
-            -blockSize/2.0f,
-            -blockSize/2.0f,
+            blockSize/width.toFloat()/2.0f,
+            blockSize/height.toFloat()/2.0f,
+            0.0f,
             1.0f
         )
 
-        return panel.localToWorld(Vector4f(0.5f, 0.5f, 0.25f, 1f).add(offset))
+        return panel.localToWorld(Vector4f(0.5f, 0.5f, blockSize, 1f).add(offset))
     }
     override fun render(group: RenderEntityGroup) {
         if (position.x.isNaN() || position.y.isNaN() || position.z.isNaN()) return
